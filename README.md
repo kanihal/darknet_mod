@@ -11,4 +11,4 @@ It'll create images containing training images, labels folder corresponding labe
 
 you can feed train.txt for yolo darknet for training
  
-## For Details using on using darknet for detection and training,  refer procedures give @ https://pjreddie.com/darknet/yolo/  
+## For Details on using darknet for detection and retraining yolo,  refer to procedures given @ https://pjreddie.com/darknet/yolo/  
