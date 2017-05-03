@@ -1,4 +1,4 @@
-##Helper scripts to  convert annotations o/p by vatic tool to yolo/darknet trainable format
+## Helper scripts to  convert annotations o/p by vatic tool to yolo/darknet trainable format
 
 1.simple_util_make_images_labels.sh <folder where images can be found[nested subfolders of images is also fine]> <vatic o/p annotations .txt file> 
 
