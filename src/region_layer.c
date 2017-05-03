@@ -314,6 +314,7 @@ void get_region_boxes(layer l, int w, int h, float thresh, float **probs, box *b
             float scale = predictions[p_index];
             int box_index = index * (l.classes + 5);
             boxes[index] = get_region_box(predictions, l.biases, n, box_index, col, row, l.w, l.h);
+            //jaggi  normalized height and weight given during training
             boxes[index].x *= w;
             boxes[index].y *= h;
             boxes[index].w *= w;

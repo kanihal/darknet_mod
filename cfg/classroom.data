@@ -1,0 +1,5 @@
+classes= 80
+train  = /home/jagadeesh/jaggi/classroom-annotated/train/train.txt
+valid = /home/jagadeesh/jaggi/classroom-annotated/valid/valid.txt
+names = data/coco.names
+backup = backup_cls

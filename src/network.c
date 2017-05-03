@@ -6,7 +6,6 @@
 #include "data.h"
 #include "utils.h"
 #include "blas.h"
-
 #include "crop_layer.h"
 #include "connected_layer.h"
 #include "gru_layer.h"
@@ -40,9 +39,9 @@ void reset_momentum(network net)
     net.learning_rate = 0;
     net.momentum = 0;
     net.decay = 0;
-    #ifdef GPU
-        //if(net.gpu_index >= 0) update_network_gpu(net);
-    #endif
+#ifdef GPU
+    //if(net.gpu_index >= 0) update_network_gpu(net);
+#endif
 }
 
 float get_current_rate(network net)
@@ -51,80 +50,80 @@ float get_current_rate(network net)
     int i;
     float rate;
     switch (net.policy) {
-        case CONSTANT:
-            return net.learning_rate;
-        case STEP:
-            return net.learning_rate * pow(net.scale, batch_num/net.step);
-        case STEPS:
-            rate = net.learning_rate;
-            for(i = 0; i < net.num_steps; ++i){
-                if(net.steps[i] > batch_num) return rate;
-                rate *= net.scales[i];
-                //if(net.steps[i] > batch_num - 1 && net.scales[i] > 1) reset_momentum(net);
-            }
-            return rate;
-        case EXP:
-            return net.learning_rate * pow(net.gamma, batch_num);
-        case POLY:
-            if (batch_num < net.burn_in) return net.learning_rate * pow((float)batch_num / net.burn_in, net.power);
-            return net.learning_rate * pow(1 - (float)batch_num / net.max_batches, net.power);
-        case RANDOM:
-            return net.learning_rate * pow(rand_uniform(0,1), net.power);
-        case SIG:
-            return net.learning_rate * (1./(1.+exp(net.gamma*(batch_num - net.step))));
-        default:
-            fprintf(stderr, "Policy is weird!\n");
-            return net.learning_rate;
+    case CONSTANT:
+        return net.learning_rate;
+    case STEP:
+        return net.learning_rate * pow(net.scale, batch_num/net.step);
+    case STEPS:
+        rate = net.learning_rate;
+        for(i = 0; i < net.num_steps; ++i){
+            if(net.steps[i] > batch_num) return rate;
+            rate *= net.scales[i];
+            //if(net.steps[i] > batch_num - 1 && net.scales[i] > 1) reset_momentum(net);
+        }
+        return rate;
+    case EXP:
+        return net.learning_rate * pow(net.gamma, batch_num);
+    case POLY:
+        if (batch_num < net.burn_in) return net.learning_rate * pow((float)batch_num / net.burn_in, net.power);
+        return net.learning_rate * pow(1 - (float)batch_num / net.max_batches, net.power);
+    case RANDOM:
+        return net.learning_rate * pow(rand_uniform(0,1), net.power);
+    case SIG:
+        return net.learning_rate * (1./(1.+exp(net.gamma*(batch_num - net.step))));
+    default:
+        fprintf(stderr, "Policy is weird!\n");
+        return net.learning_rate;
     }
 }
 
 char *get_layer_string(LAYER_TYPE a)
 {
     switch(a){
-        case CONVOLUTIONAL:
-            return "convolutional";
-        case ACTIVE:
-            return "activation";
-        case LOCAL:
-            return "local";
-        case DECONVOLUTIONAL:
-            return "deconvolutional";
-        case CONNECTED:
-            return "connected";
-        case RNN:
-            return "rnn";
-        case GRU:
-            return "gru";
-        case CRNN:
-            return "crnn";
-        case MAXPOOL:
-            return "maxpool";
-        case REORG:
-            return "reorg";
-        case AVGPOOL:
-            return "avgpool";
-        case SOFTMAX:
-            return "softmax";
-        case DETECTION:
-            return "detection";
-        case REGION:
-            return "region";
-        case DROPOUT:
-            return "dropout";
-        case CROP:
-            return "crop";
-        case COST:
-            return "cost";
-        case ROUTE:
-            return "route";
-        case SHORTCUT:
-            return "shortcut";
-        case NORMALIZATION:
-            return "normalization";
-        case BATCHNORM:
-            return "batchnorm";
-        default:
-            break;
+    case CONVOLUTIONAL:
+        return "convolutional";
+    case ACTIVE:
+        return "activation";
+    case LOCAL:
+        return "local";
+    case DECONVOLUTIONAL:
+        return "deconvolutional";
+    case CONNECTED:
+        return "connected";
+    case RNN:
+        return "rnn";
+    case GRU:
+        return "gru";
+    case CRNN:
+        return "crnn";
+    case MAXPOOL:
+        return "maxpool";
+    case REORG:
+        return "reorg";
+    case AVGPOOL:
+        return "avgpool";
+    case SOFTMAX:
+        return "softmax";
+    case DETECTION:
+        return "detection";
+    case REGION:
+        return "region";
+    case DROPOUT:
+        return "dropout";
+    case CROP:
+        return "crop";
+    case COST:
+        return "cost";
+    case ROUTE:
+        return "route";
+    case SHORTCUT:
+        return "shortcut";
+    case NORMALIZATION:
+        return "normalization";
+    case BATCHNORM:
+        return "batchnorm";
+    default:
+        break;
     }
     return "none";
 }
@@ -135,10 +134,10 @@ network make_network(int n)
     net.n = n;
     net.layers = calloc(net.n, sizeof(layer));
     net.seen = calloc(1, sizeof(int));
-    #ifdef GPU
+#ifdef GPU
     net.input_gpu = calloc(1, sizeof(float *));
     net.truth_gpu = calloc(1, sizeof(float *));
-    #endif
+#endif
     return net;
 }
 
@@ -154,6 +153,52 @@ void forward_network(network net, network_state state)
         }
         l.forward(l, state);
         state.input = l.output;
+
+        //Jaggi - enter feature tap  code here
+        /*int m,n,o;
+        if(i==29){
+            //            fprintf(stdout, "layer10 dimensions\n");
+            //            fprintf(stdout,"%d, %d, %d \n",l.h,l.w,l.c);
+            //            fprintf(stdout,"%d, %d, %d \n",l.out_h,l.out_w,l.out_c);
+            //            fprintf(stdout, "layer10 feature vector\n");
+
+
+        for(m=0;m<l.out_h;m++){
+            //fprintf(stdout,"*************************************************************************\n");
+            for(n=0;n<l.out_w;n++){
+                for(o=0;o<l.out_c;o++){
+                    fprintf(stdout,"%f\n",l.output[out_h*m+out_w*n+o]);
+                }
+                //fprintf(stdout,"\n");
+            }
+        }
+    }*/
+    }
+}
+
+
+void save_features(network net, int i,char* file,float avg_prob){
+    FILE *fp;
+    char* filename=NULL;
+    filename = calloc(strlen("features/")+strlen(basename(file))+ strlen(".feat"),sizeof(char));
+    strcat(filename,"features/");
+    strcat(filename, basename(file));
+    strcat(filename, ".feat");
+
+    if ((fp = fopen(filename, "w")) == NULL) {
+        printf("File open error: %s\n", filename);
+        exit(1);
+    }
+
+    layer l = net.layers[i];
+    int m,n,o;
+    for(m=0;m<l.out_h;m++){
+        for(n=0;n<l.out_w;n++){
+            for(o=0;o<l.out_c;o++){
+                fprintf(fp,"%f\n",l.output[l.out_h*m+l.out_w*n+o]);
+            }
+            //fprintf(stdout,"\n");
+        }
     }
 }
 
@@ -163,9 +208,13 @@ void update_network(network net)
     int update_batch = net.batch*net.subdivisions;
     float rate = get_current_rate(net);
     for(i = 0; i < net.n; ++i){
-        layer l = net.layers[i];
-        if(l.update){
-            l.update(l, update_batch, rate, net.momentum, net.decay);
+        //freeze layers < 23 and only from 24 onwards,
+        if(i>23){
+            layer l = net.layers[i];
+            if(l.update){
+                fprintf(stderr,"updating layer %d \n",i);
+                l.update(l, update_batch, rate, net.momentum, net.decay);
+            }
         }
     }
 }
@@ -180,6 +229,7 @@ float *get_network_output(network net)
     return net.layers[i].output;
 }
 
+//what is this??
 float get_network_cost(network net)
 {
     int i;
@@ -194,6 +244,7 @@ float get_network_cost(network net)
     return sum/count;
 }
 
+//jaggi - this is where the class prediction is happening
 int get_predicted_class_network(network net)
 {
     float *out = get_network_output(net);
@@ -262,6 +313,7 @@ float train_network_sgd(network net, data d, int n)
 
 float train_network(network net, data d)
 {
+    printf("train net\n");
     assert(d.X.rows % net.batch == 0);
     int batch = net.batch;
     int n = d.X.rows / batch;
@@ -443,7 +495,7 @@ void visualize_network(network net)
         if(l.type == CONVOLUTIONAL){
             prev = visualize_convolutional_layer(l, buff, prev);
         }
-    } 
+    }
 }
 
 void top_predictions(network net, int k, int *index)
@@ -494,7 +546,7 @@ matrix network_predict_data_multi(network net, data test, int n)
         }
     }
     free(X);
-    return pred;   
+    return pred;
 }
 
 matrix network_predict_data(network net, data test)
@@ -517,7 +569,7 @@ matrix network_predict_data(network net, data test)
         }
     }
     free(X);
-    return pred;   
+    return pred;
 }
 
 void print_network(network net)
@@ -559,7 +611,7 @@ void compare_networks(network n1, network n2, data test)
     printf("%5d %5d\n%5d %5d\n", a, b, c, d);
     float num = pow((abs(b - c) - 1.), 2.);
     float den = b + c;
-    printf("%f\n", num/den); 
+    printf("%f\n", num/den);
 }
 
 float network_accuracy(network net, data d)

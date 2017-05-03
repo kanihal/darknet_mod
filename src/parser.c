@@ -413,7 +413,7 @@ layer parse_batchnorm(list *options, size_params params)
 
 layer parse_shortcut(list *options, size_params params, network net)
 {
-    char *l = option_find(options, "from");   
+    char *l = option_find(options, "from");
     int index = atoi(l);
     if(index < 0) index = params.index + index;
 
@@ -448,7 +448,7 @@ layer parse_activation(list *options, size_params params)
 
 route_layer parse_route(list *options, size_params params, network net)
 {
-    char *l = option_find(options, "layers");   
+    char *l = option_find(options, "layers");
     int len = strlen(l);
     if(!l) error("Route Layer must specify input layers");
     int n = 1;
@@ -541,8 +541,8 @@ void parse_net_options(list *options, network *net)
         net->step = option_find_int(options, "step", 1);
         net->scale = option_find_float(options, "scale", 1);
     } else if (net->policy == STEPS){
-        char *l = option_find(options, "steps");   
-        char *p = option_find(options, "scales");   
+        char *l = option_find(options, "steps");
+        char *p = option_find(options, "scales");
         if(!l || !p) error("STEPS policy must have steps and scales in cfg file");
 
         int len = strlen(l);
@@ -679,7 +679,7 @@ network parse_network_cfg(char *filename)
             params.c = l.out_c;
             params.inputs = l.outputs;
         }
-    }   
+    }
     free_list(sections);
     net.outputs = get_network_output_size(net);
     net.output = get_network_output(net);
@@ -710,23 +710,23 @@ list *read_cfg(char *filename)
         ++ nu;
         strip(line);
         switch(line[0]){
-            case '[':
-                current = malloc(sizeof(section));
-                list_insert(sections, current);
-                current->options = make_list();
-                current->type = line;
-                break;
-            case '\0':
-            case '#':
-            case ';':
+        case '[':
+            current = malloc(sizeof(section));
+            list_insert(sections, current);
+            current->options = make_list();
+            current->type = line;
+            break;
+        case '\0':
+        case '#':
+        case ';':
+            free(line);
+            break;
+        default:
+            if(!read_option(line, current->options)){
+                fprintf(stderr, "Config file error line %d, could parse: %s\n", nu, line);
                 free(line);
-                break;
-            default:
-                if(!read_option(line, current->options)){
-                    fprintf(stderr, "Config file error line %d, could parse: %s\n", nu, line);
-                    free(line);
-                }
-                break;
+            }
+            break;
         }
     }
     fclose(file);
@@ -1012,7 +1012,8 @@ void load_weights_upto(network *net, char *filename, int cutoff)
         cuda_set_device(net->gpu_index);
     }
 #endif
-    fprintf(stderr, "Loading weights from %s...", filename);
+    fprintf(stderr, "Loading weights from %s...till layer %d / %d....\n", filename,cutoff,net->n);
+
     fflush(stdout);
     FILE *fp = fopen(filename, "rb");
     if(!fp) file_error(filename);
@@ -1029,27 +1030,36 @@ void load_weights_upto(network *net, char *filename, int cutoff)
     int i;
     for(i = 0; i < net->n && i < cutoff; ++i){
         layer l = net->layers[i];
-        if (l.dontload) continue;
+        if (l.dontload){
+            fprintf(stderr,"%d dontload\n",i);
+            continue;
+        }
         if(l.type == CONVOLUTIONAL){
+            fprintf(stderr,"%d conv\n",i);
             load_convolutional_weights(l, fp);
         }
         if(l.type == CONNECTED){
+            fprintf(stderr,"%d connected\n",i);
             load_connected_weights(l, fp, transpose);
         }
         if(l.type == BATCHNORM){
+            fprintf(stderr,"%d BATCHNORM\n",i);
             load_batchnorm_weights(l, fp);
         }
         if(l.type == CRNN){
+            fprintf(stderr,"%d CRNN\n",i);
             load_convolutional_weights(*(l.input_layer), fp);
             load_convolutional_weights(*(l.self_layer), fp);
             load_convolutional_weights(*(l.output_layer), fp);
         }
         if(l.type == RNN){
+            fprintf(stderr,"%d RNN\n",i);
             load_connected_weights(*(l.input_layer), fp, transpose);
             load_connected_weights(*(l.self_layer), fp, transpose);
             load_connected_weights(*(l.output_layer), fp, transpose);
         }
         if(l.type == GRU){
+            fprintf(stderr,"%d GRU\n",i);
             load_connected_weights(*(l.input_z_layer), fp, transpose);
             load_connected_weights(*(l.input_r_layer), fp, transpose);
             load_connected_weights(*(l.input_h_layer), fp, transpose);
@@ -1058,6 +1068,7 @@ void load_weights_upto(network *net, char *filename, int cutoff)
             load_connected_weights(*(l.state_h_layer), fp, transpose);
         }
         if(l.type == LOCAL){
+            fprintf(stderr,"%d LOCAL\n",i);
             int locations = l.out_w*l.out_h;
             int size = l.size*l.size*l.c*l.n*locations;
             fread(l.biases, sizeof(float), l.outputs, fp);
@@ -1075,6 +1086,7 @@ void load_weights_upto(network *net, char *filename, int cutoff)
 
 void load_weights(network *net, char *filename)
 {
+
     load_weights_upto(net, filename, net->n);
 }
 

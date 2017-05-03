@@ -6,6 +6,7 @@
 #include "box.h"
 #include "demo.h"
 #include "option_list.h"
+#include "post_predictions.h"
 
 #ifdef OPENCV
 #include "opencv2/highgui/highgui_c.h"
@@ -16,7 +17,7 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
 {
     list *options = read_data_cfg(datacfg);
     char *train_images = option_find_str(options, "train", "data/train.list");
-    char *backup_directory = option_find_str(options, "backup", "/backup/");
+    char *backup_directory = option_find_str(options, "backup", "backup/");
 
     srand(time(0));
     char *base = basecfg(cfgfile);
@@ -204,7 +205,7 @@ void print_detector_detections(FILE **fps, char *id, box *boxes, float **probs, 
 
         for(j = 0; j < classes; ++j){
             if (probs[i][j]) fprintf(fps[j], "%s %f %f %f %f %f\n", id, probs[i][j],
-                    xmin, ymin, xmax, ymax);
+                                     xmin, ymin, xmax, ymax);
         }
     }
 }
@@ -353,7 +354,7 @@ void validate_detector(char *datacfg, char *cfgfile, char *weightfile, char *out
         if(fps) fclose(fps[j]);
     }
     if(coco){
-        fseek(fp, -2, SEEK_CUR); 
+        fseek(fp, -2, SEEK_CUR);
         fprintf(fp, "\n]\n");
         fclose(fp);
     }
@@ -437,19 +438,24 @@ void validate_detector_recall(char *cfgfile, char *weightfile)
         free_image(sized);
     }
 }
-
+//temporary hack to allow processing multiple images, load weights only once
+int is_loaded=0;
+int is_multiple=0;
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh)
 {
     list *options = read_data_cfg(datacfg);
     char *name_list = option_find_str(options, "names", "data/names.list");
     char **names = get_labels(name_list);
-
-    image **alphabet = load_alphabet();
-    network net = parse_network_cfg(cfgfile);
-    if(weightfile){
-        load_weights(&net, weightfile);
+    static network net;
+    static image **alphabet;
+    if (is_loaded==0){
+        alphabet = load_alphabet();
+        net = parse_network_cfg(cfgfile);
+        if(weightfile){
+            load_weights(&net, weightfile);
+        }
+        set_batch_network(&net, 1);
     }
-    set_batch_network(&net, 1);
     srand(2222222);
     clock_t time;
     char buff[256];
@@ -471,6 +477,8 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         layer l = net.layers[net.n-1];
 
         box *boxes = calloc(l.w*l.h*l.n, sizeof(box));
+        int *counts=(int *) calloc(l.classes,sizeof(int));
+
         float **probs = calloc(l.w*l.h*l.n, sizeof(float *));
         for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = calloc(l.classes + 1, sizeof(float *));
 
@@ -482,19 +490,65 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         if (l.softmax_tree && nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         else if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         draw_detections(im, l.w*l.h*l.n, thresh, boxes, probs, names, alphabet, l.classes);
-        save_image(im, "predictions");
-        show_image(im, "predictions");
+        //jaggi
+        printf("w=%d h=%d n=%d\n", l.w,l.h,l.n);
+        save_detections_counts(filename, l.w*l.h*l.n, im.w, im.h, thresh, boxes, probs, names, l.classes,counts);
+        save_counts(filename, l.w*l.h*l.n, im.w, im.h, thresh, boxes, probs, names, l.classes,counts);
+        printf("Wrote result to: csv File \n");
+        float avg_prob=get_avg_prob(probs,l.w*l.h*l.n,thresh,l.classes);
+        if (avg_prob<0.75){
+            printf("avg_prob = %f, saving features...",avg_prob);
+            //save_features(net,29,filename,avg_prob);
+            FILE *fp;
+            if ((fp = fopen("uncertain.list", "w")) == NULL) {
+                printf("File open error: %s\n", filename);
+                exit(1);
+            }
+            fprintf(fp,"%s\t%f\n",filename,avg_prob);
+            printf("Done\n");
+        }
+        char* pred_img_file;
+        pred_img_file = malloc(strlen("predictions_") +strlen(basename(filename)));
+        strcpy(pred_img_file, "predictions_");
+        strcat(pred_img_file, basename(filename));
 
+        save_image(im, pred_img_file);
+        if(is_multiple==0){
+            show_image(im, "predictions");
+        }
         free_image(im);
         free_image(sized);
         free(boxes);
+        free(counts);
         free_ptrs((void **)probs, l.w*l.h*l.n);
 #ifdef OPENCV
-        cvWaitKey(0);
-        cvDestroyAllWindows();
+        if(is_multiple==0){
+            cvWaitKey(0);
+            cvDestroyAllWindows();
+        }
 #endif
         if (filename) break;
     }
+}
+
+void test_detector_multiple(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh){
+    FILE *fp;
+    fp = fopen(filename, "r");
+    char imgfile[1000];
+    if (fp){
+        is_multiple=1;
+        while(fgets(imgfile,sizeof(imgfile), fp)){
+            if(imgfile[strlen(imgfile) - 1] == '\n'){
+                imgfile[strlen(imgfile) - 1] = '\0'; // eat the newline fgets() stores
+            }printf("Processing - %s\n",imgfile);
+            test_detector(datacfg, cfgfile, weightfile, imgfile, thresh, hier_thresh);
+            is_loaded=1;
+            printf("Done\n");
+        }
+        is_loaded=0;
+    }
+    is_multiple=0;
+    fclose(fp);
 }
 
 void run_detector(int argc, char **argv)
@@ -538,11 +592,17 @@ void run_detector(int argc, char **argv)
     char *cfg = argv[4];
     char *weights = (argc > 5) ? argv[5] : 0;
     char *filename = (argc > 6) ? argv[6]: 0;
-    if(0==strcmp(argv[2], "test")) test_detector(datacfg, cfg, weights, filename, thresh, hier_thresh);
-    else if(0==strcmp(argv[2], "train")) train_detector(datacfg, cfg, weights, gpus, ngpus, clear);
-    else if(0==strcmp(argv[2], "valid")) validate_detector(datacfg, cfg, weights, outfile);
-    else if(0==strcmp(argv[2], "recall")) validate_detector_recall(cfg, weights);
-    else if(0==strcmp(argv[2], "demo")) {
+    if(0==strcmp(argv[2], "test") || 0==strcmp(argv[2], "testimg"))
+        test_detector(datacfg, cfg, weights, filename, thresh, hier_thresh);
+    else if(0==strcmp(argv[2], "testimglist"))
+        test_detector_multiple(datacfg, cfg, weights, filename, thresh, hier_thresh);
+    else if(0==strcmp(argv[2], "train"))
+        train_detector(datacfg, cfg, weights, gpus, ngpus, clear);
+    else if(0==strcmp(argv[2], "valid"))
+        validate_detector(datacfg, cfg, weights, outfile);
+    else if(0==strcmp(argv[2], "recall"))
+        validate_detector_recall(cfg, weights);
+    else if(0==strcmp(argv[2], "demo") || 0==strcmp(argv[2], "testvid")) {
         list *options = read_data_cfg(datacfg);
         int classes = option_find_int(options, "classes", 20);
         char *name_list = option_find_str(options, "names", "data/names.list");

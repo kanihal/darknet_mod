@@ -83,10 +83,13 @@ void update_network_gpu(network net)
     int update_batch = net.batch*net.subdivisions;
     float rate = get_current_rate(net);
     for(i = 0; i < net.n; ++i){
-        layer l = net.layers[i];
-        l.t = get_current_batch(net);
-        if(l.update_gpu){
-            l.update_gpu(l, update_batch, rate, net.momentum, net.decay);
+        if(i>23){
+            layer l = net.layers[i];
+            l.t = get_current_batch(net);
+            if(l.update_gpu){
+                fprintf(stderr,"updating layer %d \n",i);
+                l.update_gpu(l, update_batch, rate, net.momentum, net.decay);
+            }
         }
     }
 }

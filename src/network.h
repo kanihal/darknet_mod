@@ -7,6 +7,11 @@
 #include "data.h"
 #include "tree.h"
 
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <libgen.h>
+
 typedef enum {
     CONSTANT, STEP, EXP, POLY, STEPS, SIG, RANDOM
 } learning_rate_policy;
@@ -124,6 +129,6 @@ float get_network_cost(network net);
 
 int get_network_nuisance(network net);
 int get_network_background(network net);
-
+void save_features(network net, int i,char* file,float avg_prob);
 #endif
 

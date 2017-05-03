@@ -22,7 +22,7 @@ void train_coco(char *cfgfile, char *weightfile)
     //char *train_images = "/home/pjreddie/data/coco/train.txt";
     char *train_images = "data/coco.trainval.txt";
     //char *train_images = "data/bags.train.list";
-    char *backup_directory = "/home/pjreddie/backup/";
+    char *backup_directory = "backup/";
     srand(time(0));
     char *base = basecfg(cfgfile);
     printf("%s\n", base);
@@ -240,7 +240,7 @@ void validate_coco_recall(char *cfgfile, char *weightfile)
     srand(time(0));
 
     char *base = "results/comp4_det_test_";
-    list *plist = get_paths("/home/pjreddie/data/voc/test/2007_test.txt");
+    list *plist = get_paths("data/voc/test/2007_test.txt");
     char **paths = (char **)list_to_array(plist);
 
     layer l = net.layers[net.n-1];
